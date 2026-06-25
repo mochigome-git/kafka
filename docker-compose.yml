@@ -11,7 +11,7 @@ services:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1.pixelsofts.com:9094,2@kafka2.pixelsofts.com:9094  # CHANGED: both nodes
-      CLUSTER_ID: "PASTE-SAME-UUID-ON-BOTH-NODES"     # NEW: required for multi-node (see below)
+      CLUSTER_ID: ${KAFKA_CLUSTER_UUID}     # NEW: required for multi-node (see below)
       # Listeners
       KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9094,SSL://:9093
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,SSL://${KAFKA_DOMAIN}:9093  # CHANGED: SSL host from .env
