@@ -1,56 +1,70 @@
-# docker-compose.yml
-# One Kafka broker per EC2 instance, KRaft mode (no ZooKeeper), TLS on the client/inter-broker listener.
-# Deploy this SAME file on both EC2 boxes; only the .env differs (NODE_ID + ADVERTISED_HOST).
-#
-#   EC2 #1 .env:  NODE_ID=1   ADVERTISED_HOST=kafka1.general-my.com
-#   EC2 #2 .env:  NODE_ID=2   ADVERTISED_HOST=kafka2.general-my.com
-#
+networks:
+  kafkanet:
+    driver: bridge
 services:
   kafka:
-    image: confluentinc/cp-kafka:7.7.1
+    image: apache/kafka:4.1.0
     container_name: kafka
-    restart: unless-stopped
-    ports:
-      - "9092:9092"   # SSL  - clients + inter-broker
-      - "9093:9093"   # CONTROLLER - KRaft quorum (keep inside the VPC / security group)
     environment:
-      # ---- KRaft cluster identity ----
-      KAFKA_NODE_ID: ${NODE_ID}
-      KAFKA_PROCESS_ROLES: "broker,controller"
-      # Both nodes are voters. The host part must be reachable between the two EC2s.
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka1.general-my.com:9093,2@kafka2.general-my.com:9093"
-      CLUSTER_ID: "${CLUSTER_ID}"
-
-      # ---- Listeners ----
-      # SSL  -> client + inter-broker traffic (encrypted)
-      # CONTROLLER -> KRaft metadata (PLAINTEXT here; lock it down with a security group)
-      KAFKA_LISTENERS: "SSL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
-      KAFKA_ADVERTISED_LISTENERS: "SSL://${ADVERTISED_HOST}:9092"
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,SSL:SSL"
-      KAFKA_INTER_BROKER_LISTENER_NAME: "SSL"
-      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
-
-      # ---- TLS (server-side encryption; clients only need the CA, not a client cert) ----
-      KAFKA_SSL_KEYSTORE_FILENAME: "kafka.keystore.jks"
-      KAFKA_SSL_KEYSTORE_CREDENTIALS: "kafka_keystore_creds"
-      KAFKA_SSL_KEY_CREDENTIALS: "kafka_key_creds"
-      KAFKA_SSL_TRUSTSTORE_FILENAME: "kafka.truststore.jks"
-      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: "kafka_truststore_creds"
-      # "https" enforces hostname verification against the cert SAN.
-      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: "https"
-      # "none" = encryption only. Set to "required" to enforce mutual TLS (clients then need their own cert).
-      KAFKA_SSL_CLIENT_AUTH: "none"
-
-      # ---- Replication / durability for a 2-broker cluster ----
-      KAFKA_DEFAULT_REPLICATION_FACTOR: 2
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
+      # Cluster Basics
+      KAFKA_NODE_ID: ${NODE_ID}                       # CHANGED: was 1, now from .env (1 or 2)
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1.pixelsofts.com:9094,2@kafka2.pixelsofts.com:9094  # CHANGED: both nodes
+      CLUSTER_ID: "PASTE-SAME-UUID-ON-BOTH-NODES"     # NEW: required for multi-node (see below)
+      # Listeners
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9094,SSL://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,SSL://${KAFKA_DOMAIN}:9093  # CHANGED: SSL host from .env
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,SSL:SSL
+      KAFKA_INTER_BROKER_LISTENER_NAME: SSL           # CHANGED: was PLAINTEXT — inter-broker now crosses hosts
+      # Broker Configuration
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2       # CHANGED: was 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2  # CHANGED: was 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_MIN_INSYNC_REPLICAS: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+      # SSL Configuration (unchanged — your key_creds naming kept as-is)
+      KAFKA_SSL_KEYSTORE_FILENAME: kafka.keystore.jks
+      KAFKA_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/kafka.keystore.jks
+      KAFKA_SSL_KEY_CREDENTIALS: key_creds
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: key_creds
+      KAFKA_SSL_TRUSTSTORE_FILENAME: kafka.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: key_creds
+      KAFKA_SSL_CLIENT_AUTH: none
+      KAFKA_SSL_KEYSTORE_TYPE: JKS
+      KAFKA_SSL_TRUSTSTORE_TYPE: JKS
+    healthcheck:
+      test: [ "CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list" ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
     volumes:
-      - ./secrets:/etc/kafka/secrets:ro
-      - kafka-data:/var/lib/kafka/data
-
+      - kafka_data:/var/lib/kafka/data
+      - /home/ec2-user/kafka/certs:/etc/kafka/secrets:ro
+    ports:
+      - 9092:9092   # PLAINTEXT internal
+      - 9093:9093   # SSL external + inter-broker
+      - 9094:9094   # NEW: CONTROLLER — restrict to the 2 instances in your security group
+    networks:
+      - kafkanet
+    restart: unless-stopped
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: appdb
+    ports:
+      - 5432:5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - kafkanet
 volumes:
-  kafka-data:
+  pgdata:
+  kafka_data:

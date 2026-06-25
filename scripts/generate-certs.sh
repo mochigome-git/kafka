@@ -28,6 +28,21 @@ set -euo pipefail
 OUT_DIR="${OUT_DIR:-../secrets}"
 VALIDITY_DAYS="${VALIDITY_DAYS:-3650}"
 
+# ----------------------------------------------------------------------------
+# Configuration — read from .env (override the path with ENV_FILE=/path ./generate-certs.sh)
+# ----------------------------------------------------------------------------
+ENV_FILE="${ENV_FILE:-.env}"
+if [[ -f "$ENV_FILE" ]]; then
+  set -a              # auto-export everything defined in .env
+  source "$ENV_FILE"
+  set +a
+else
+  echo ">> No $ENV_FILE found — falling back to defaults" >&2
+fi
+
+OUT_DIR="${OUT_DIR:-../secrets}"
+VALIDITY_DAYS="${VALIDITY_DAYS:-3650}"
+
 # Passwords. Use ONE shared value for keystore + key to avoid the classic
 # "keystore was tampered with, or password was incorrect" mismatch.
 STORE_PASS="${STORE_PASS:-changeit-keystore}"
