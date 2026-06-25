@@ -28,9 +28,11 @@ services:
       KAFKA_NUM_PARTITIONS: 3
 
       # SSL Configuration (apache/kafka style: direct passwords from .env)
-      KAFKA_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/kafka.keystore.jks
-      KAFKA_SSL_KEYSTORE_PASSWORD: ${STORE_PASS}
-      KAFKA_SSL_KEY_PASSWORD: ${KEY_PASS}
+      KAFKA_SSL_KEYSTORE_FILENAME: kafka.keystore.jks    # filename only; file must be in the mounted secrets dir
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: key_creds          # file in secrets dir containing the keystore password
+      KAFKA_SSL_KEY_CREDENTIALS: key_creds               # file in secrets dir containing the key password
+      # Truststore (needed because inter-broker = SSL): pass directly — with client-auth=none the
+      # script skips its truststore file-wiring, so set location+password yourself.
       KAFKA_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.truststore.jks
       KAFKA_SSL_TRUSTSTORE_PASSWORD: ${TRUST_PASS}
       KAFKA_SSL_CLIENT_AUTH: none
