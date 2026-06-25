@@ -7,21 +7,24 @@ services:
     container_name: kafka
     environment:
       # Cluster Basics
-      KAFKA_NODE_ID: ${NODE_ID}                       # CHANGED: was 1, now from .env (1 or 2)
+      KAFKA_NODE_ID: ${NODE_ID}                       
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1.pixelsofts.com:9094,2@kafka2.pixelsofts.com:9094  # CHANGED: both nodes
-      CLUSTER_ID: ${KAFKA_CLUSTER_UUID}     # NEW: required for multi-node (see below)
+      KAFKA_CONTROLLER_QUORUM_VOTERS: ${KAFKA_QUORUM_VOTERS}
+      CLUSTER_ID: ${KAFKA_CLUSTER_UUID}     # Nrequired for multi-node 
+
       # Listeners
+      # - Internal PLAINTEXT (for local containers)
+      # - External SSL (for remote clients)
       KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9094,SSL://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,SSL://${KAFKA_DOMAIN}:9093  # CHANGED: SSL host from .env
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,SSL://${KAFKA_DOMAIN}:9093 
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,SSL:SSL
-      KAFKA_INTER_BROKER_LISTENER_NAME: SSL           # CHANGED: was PLAINTEXT — inter-broker now crosses hosts
+      KAFKA_INTER_BROKER_LISTENER_NAME: SSL 
       # Broker Configuration
       KAFKA_LOG_DIRS: /var/lib/kafka/data
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2       # CHANGED: was 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2  # CHANGED: was 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2       
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2  
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_MIN_INSYNC_REPLICAS: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
