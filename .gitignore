@@ -5,3 +5,4 @@ secrets/*.csr
 secrets/*.srl
 secrets/*_creds
 .env
+/certs
