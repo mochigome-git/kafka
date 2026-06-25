@@ -30,9 +30,11 @@ set -euo pipefail
 # ----------------------------------------------------------------------------
 # Configuration — read from .env (override the path with ENV_FILE=/path ./generate-certs.sh)
 # ----------------------------------------------------------------------------
-ENV_FILE="${ENV_FILE:-.env}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/../.env}"
+
 if [[ -f "$ENV_FILE" ]]; then
-  set -a              # auto-export everything defined in .env
+  set -a
   source "$ENV_FILE"
   set +a
 else
