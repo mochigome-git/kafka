@@ -1,0 +1,56 @@
+# docker-compose.yml
+# One Kafka broker per EC2 instance, KRaft mode (no ZooKeeper), TLS on the client/inter-broker listener.
+# Deploy this SAME file on both EC2 boxes; only the .env differs (NODE_ID + ADVERTISED_HOST).
+#
+#   EC2 #1 .env:  NODE_ID=1   ADVERTISED_HOST=kafka1.general-my.com
+#   EC2 #2 .env:  NODE_ID=2   ADVERTISED_HOST=kafka2.general-my.com
+#
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"   # SSL  - clients + inter-broker
+      - "9093:9093"   # CONTROLLER - KRaft quorum (keep inside the VPC / security group)
+    environment:
+      # ---- KRaft cluster identity ----
+      KAFKA_NODE_ID: ${NODE_ID}
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      # Both nodes are voters. The host part must be reachable between the two EC2s.
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka1.general-my.com:9093,2@kafka2.general-my.com:9093"
+      CLUSTER_ID: "${CLUSTER_ID}"
+
+      # ---- Listeners ----
+      # SSL  -> client + inter-broker traffic (encrypted)
+      # CONTROLLER -> KRaft metadata (PLAINTEXT here; lock it down with a security group)
+      KAFKA_LISTENERS: "SSL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "SSL://${ADVERTISED_HOST}:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,SSL:SSL"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "SSL"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+
+      # ---- TLS (server-side encryption; clients only need the CA, not a client cert) ----
+      KAFKA_SSL_KEYSTORE_FILENAME: "kafka.keystore.jks"
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: "kafka_keystore_creds"
+      KAFKA_SSL_KEY_CREDENTIALS: "kafka_key_creds"
+      KAFKA_SSL_TRUSTSTORE_FILENAME: "kafka.truststore.jks"
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: "kafka_truststore_creds"
+      # "https" enforces hostname verification against the cert SAN.
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: "https"
+      # "none" = encryption only. Set to "required" to enforce mutual TLS (clients then need their own cert).
+      KAFKA_SSL_CLIENT_AUTH: "none"
+
+      # ---- Replication / durability for a 2-broker cluster ----
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 2
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    volumes:
+      - ./secrets:/etc/kafka/secrets:ro
+      - kafka-data:/var/lib/kafka/data
+
+volumes:
+  kafka-data:
