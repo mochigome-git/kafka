@@ -5,6 +5,8 @@ services:
   kafka:
     image: apache/kafka:4.1.0
     container_name: kafka
+    env_file:
+      - .env
     environment:
       # Cluster Basics
       KAFKA_NODE_ID: ${NODE_ID}                       
