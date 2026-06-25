@@ -26,14 +26,13 @@ services:
       KAFKA_MIN_INSYNC_REPLICAS: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_NUM_PARTITIONS: 3
-      # SSL Configuration (unchanged — your key_creds naming kept as-is)
-      KAFKA_SSL_KEYSTORE_FILENAME: kafka.keystore.jks
+
+      # SSL Configuration (apache/kafka style: direct passwords from .env)
       KAFKA_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/kafka.keystore.jks
-      KAFKA_SSL_KEY_CREDENTIALS: key_creds
-      KAFKA_SSL_KEYSTORE_CREDENTIALS: key_creds
-      KAFKA_SSL_TRUSTSTORE_FILENAME: kafka.truststore.jks
+      KAFKA_SSL_KEYSTORE_PASSWORD: ${STORE_PASS}
+      KAFKA_SSL_KEY_PASSWORD: ${KEY_PASS}
       KAFKA_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.truststore.jks
-      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: key_creds
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: ${TRUST_PASS}
       KAFKA_SSL_CLIENT_AUTH: none
       KAFKA_SSL_KEYSTORE_TYPE: JKS
       KAFKA_SSL_TRUSTSTORE_TYPE: JKS
