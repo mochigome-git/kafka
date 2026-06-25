@@ -1,8 +1,7 @@
-secrets/*.jks
-secrets/*.key
-secrets/*.crt
-secrets/*.csr
-secrets/*.srl
-secrets/*_creds
+certs/*.jks
+certs/*.key
+certs/*.crt
+certs/*.csr
+certs/*.srl
+certs/*_creds
 .env
-/certs
