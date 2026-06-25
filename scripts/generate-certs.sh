@@ -15,18 +15,17 @@
 #   kafka_keystore_creds    - file holding the keystore password
 #   kafka_key_creds         - file holding the key password
 #   kafka_truststore_creds  - file holding the truststore password
+#   key_creds               - same as kafka_key_creds, named to match docker-compose.yml
+#
+# Default OUT_DIR is ../certs — this matches the docker-compose volume mount
+# (/home/ec2-user/kafka/certs:/etc/kafka/secrets:ro), so generated certs land
+# directly where the broker container expects them. No manual copy needed.
 #
 # Usage:
 #   ./generate-certs.sh
-#   OUT_DIR=../secrets SANS="DNS:kafka1.general-my.com,DNS:kafka2.general-my.com" ./generate-certs.sh
+#   OUT_DIR=/some/other/path ./generate-certs.sh
 #
 set -euo pipefail
-
-# ----------------------------------------------------------------------------
-# Configuration (override via environment variables)
-# ----------------------------------------------------------------------------
-OUT_DIR="${OUT_DIR:-../secrets}"
-VALIDITY_DAYS="${VALIDITY_DAYS:-3650}"
 
 # ----------------------------------------------------------------------------
 # Configuration — read from .env (override the path with ENV_FILE=/path ./generate-certs.sh)
@@ -40,7 +39,7 @@ else
   echo ">> No $ENV_FILE found — falling back to defaults" >&2
 fi
 
-OUT_DIR="${OUT_DIR:-../secrets}"
+OUT_DIR="${OUT_DIR:-../certs}"
 VALIDITY_DAYS="${VALIDITY_DAYS:-3650}"
 
 # Passwords. Use ONE shared value for keystore + key to avoid the classic
@@ -74,7 +73,7 @@ echo ">> SANs: $SANS"
 # Clean any previous run so the script is idempotent
 rm -f ca.key ca.crt ca.srl kafka.csr kafka.ext kafka.crt \
       kafka.keystore.jks kafka.truststore.jks \
-      kafka_keystore_creds kafka_key_creds kafka_truststore_creds
+      kafka_keystore_creds kafka_key_creds kafka_truststore_creds key_creds
 
 # 1. Certificate Authority: private key + self-signed root certificate
 echo ">> [1/8] Creating CA key and self-signed certificate"
@@ -131,15 +130,21 @@ keytool -keystore kafka.keystore.jks \
   -alias "$BROKER_CN" -import -file kafka.crt \
   -storepass "$STORE_PASS" -keypass "$KEY_PASS" -noprompt
 
-# 8. Credential files referenced by the Confluent image env vars
+# 8. Credential files.
+#    - kafka_keystore_creds / kafka_key_creds / kafka_truststore_creds: descriptive names
+#    - key_creds: ALSO written, matching the literal filename your docker-compose.yml
+#      references for KAFKA_SSL_KEYSTORE_CREDENTIALS / KAFKA_SSL_KEY_CREDENTIALS.
+#      (Keystore and key share the same password here, so one file covers both.)
 echo ">> [8/8] Writing credential files"
 printf '%s' "$STORE_PASS" > kafka_keystore_creds
 printf '%s' "$KEY_PASS"   > kafka_key_creds
 printf '%s' "$TRUST_PASS" > kafka_truststore_creds
-chmod 600 kafka_keystore_creds kafka_key_creds kafka_truststore_creds ca.key
+printf '%s' "$KEY_PASS"   > key_creds
+chmod 600 kafka_keystore_creds kafka_key_creds kafka_truststore_creds key_creds ca.key
+chmod 644 kafka.keystore.jks kafka.truststore.jks
 
 echo
 echo ">> Done. Artifacts in $(pwd):"
 ls -1 ca.key ca.crt ca.srl kafka.csr kafka.ext kafka.crt \
       kafka.keystore.jks kafka.truststore.jks \
-      kafka_keystore_creds kafka_key_creds kafka_truststore_creds
+      kafka_keystore_creds kafka_key_creds kafka_truststore_creds key_creds
