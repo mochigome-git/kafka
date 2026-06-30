@@ -65,6 +65,7 @@ services:
     restart: unless-stopped
   postgres:
     image: postgres:16
+    restart: unless-stopped 
     environment:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
