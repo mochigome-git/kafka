@@ -293,7 +293,7 @@ Commands (note: apache image uses the `.sh` scripts under `/opt/kafka/bin`):
 ```bash
 # Create (RF 2 spreads across both brokers)
 docker exec -it kafka /opt/kafka/bin/kafka-topics.sh \
-  --bootstrap-server kafka1.pixelsofts.com:9093 \
+  --bootstrap-server localhost:9093 \
   --command-config /etc/kafka/secrets/client-ssl.properties \
   --create --topic raw-metrics \
   --partitions 6 --replication-factor 2 \
@@ -301,18 +301,25 @@ docker exec -it kafka /opt/kafka/bin/kafka-topics.sh \
 
 # List
 docker exec -it kafka /opt/kafka/bin/kafka-topics.sh \
-  --bootstrap-server kafka1.pixelsofts.com:9093 \
-  --command-config /etc/kafka/secrets/client-ssl.properties --list
+  --bootstrap-server localhost:9093 \
+  --list \
+  --command-config /etc/kafka/secrets/client-ssl.properties
+
+# count what's actually in the topic (per-partition latest offsets)
+docker exec kafka /opt/kafka/bin/kafka-get-offsets.sh \
+  --bootstrap-server localhost:9093 \
+  --topic gim_devices_payload \
+  --command-config /etc/kafka/secrets/client-ssl.properties
 
 # Describe
 docker exec -it kafka /opt/kafka/bin/kafka-topics.sh \
-  --bootstrap-server kafka1.pixelsofts.com:9093 \
+  --bootstrap-server localhost:9093 \
   --command-config /etc/kafka/secrets/client-ssl.properties \
   --describe --topic raw-metrics
 
 # Increase partitions (cannot decrease)
 docker exec -it kafka /opt/kafka/bin/kafka-topics.sh \
-  --bootstrap-server kafka1.pixelsofts.com:9093 \
+  --bootstrap-server localhost:9093 \
   --command-config /etc/kafka/secrets/client-ssl.properties \
   --alter --topic raw-metrics --partitions 12
 ```
@@ -322,14 +329,25 @@ Smoke test:
 ```bash
 # Producer
 docker exec -it kafka /opt/kafka/bin/kafka-console-producer.sh \
-  --bootstrap-server kafka1.pixelsofts.com:9093 \
+  --bootstrap-server localhost:9093 \
   --producer.config /etc/kafka/secrets/client-ssl.properties --topic raw-metrics
 
 # Consumer (another shell)
 docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh \
-  --bootstrap-server kafka1.pixelsofts.com:9093 \
+  --bootstrap-server localhost:9093 \
   --consumer.config /etc/kafka/secrets/client-ssl.properties \
-  --topic raw-metrics --from-beginning
+  --topic gim_devices_payload --from-beginning
+
+# does data exist / is it growing?
+docker exec kafka /opt/kafka/bin/kafka-get-offsets.sh \
+  --bootstrap-server localhost:9092 \
+  --topic gim_devices_payload
+
+# watch live
+docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic gim_devices_payload --from-beginning
+
 ```
 
 For a Go client (confluent-kafka-go / librdkafka), use the PEM CA, not the JKS:

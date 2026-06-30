@@ -5,6 +5,7 @@ services:
   kafka:
     image: apache/kafka:4.1.0
     container_name: kafka
+    hostname: ${KAFKA_DOMAIN} 
     extra_hosts:
           - "kafka1.general-my.com:${KAFKA1_IP}"
           - "kafka2.general-my.com:${KAFKA2_IP}"
